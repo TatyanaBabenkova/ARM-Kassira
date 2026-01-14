@@ -198,6 +198,10 @@
         </select>
       </div>
       <div class="form-row">
+        <label for="docDate">Дата (для новостей):</label>
+        <input type="text" id="docDate" placeholder="дд.мм.гггг" />
+      </div>
+      <div class="form-row">
         <label for="docTitle">Заголовок:</label>
         <input type="text" id="docTitle" />
       </div>
@@ -210,7 +214,8 @@
         <textarea id="docText"></textarea>
       </div>
       <button type="button" class="btn" id="addDoc">Добавить</button>
-      <span class="note">Удаление — через список ниже.</span>
+      <button type="button" class="btn" id="resetStorage">Сбросить локальные данные</button>
+      <span class="note">Удаление — через список ниже. Данные сохраняются в браузере.</span>
     </div>
 
     <div class="panel">
@@ -219,6 +224,7 @@
         <thead>
           <tr>
             <th>Раздел</th>
+            <th>Дата</th>
             <th>Номер</th>
             <th>Заголовок</th>
             <th>Описание</th>
@@ -228,23 +234,54 @@
         <tbody></tbody>
       </table>
     </div>
+
+    <div class="panel">
+      <div class="panel-title">Экспорт / импорт (JSON)</div>
+      <div class="form-row">
+        <label for="jsonData">Данные:</label>
+        <textarea id="jsonData"></textarea>
+      </div>
+      <button type="button" class="btn" id="exportJson">Экспортировать</button>
+      <button type="button" class="btn" id="importJson">Импортировать</button>
+      <div class="note">Можно копировать JSON между браузерами или компьютерами.</div>
+    </div>
   </div>
 </div>
 <script>
   (function () {
-    var docs = [
-      { section: "Новости", number: "", title: "Изменения в разделе ОПП", text: "Пример записи для блока Новости." },
-      { section: "Информация для билетных кассиров", number: "", title: "Перечень вопросов", text: "Демо‑описание раздела." },
-      { section: "Нормативно‑правовая информация", number: "7", title: "Приказ Минтранса РФ", text: "Полное название документа доступно в списке." }
+    var storageKey = "cashierPortalData";
+    var docs = [];
+    var demoDocs = [
+      { section: "Новости", date: "13.03.2024", number: "", title: "Изменения в разделе ОПП", text: "Пример записи для блока Новости." },
+      { section: "Информация для билетных кассиров", date: "", number: "", title: "Перечень вопросов", text: "Демо‑описание раздела." },
+      { section: "Нормативно‑правовая информация", date: "", number: "7", title: "Приказ Минтранса РФ", text: "Полное название документа доступно в списке." }
     ];
 
     var tableBody = document.getElementById("docTable").getElementsByTagName("tbody")[0];
+
+    function loadDocs() {
+      var raw = localStorage.getItem(storageKey);
+      if (raw) {
+        try {
+          docs = JSON.parse(raw);
+        } catch (err) {
+          docs = demoDocs.slice(0);
+        }
+      } else {
+        docs = demoDocs.slice(0);
+      }
+    }
+
+    function saveDocs() {
+      localStorage.setItem(storageKey, JSON.stringify(docs));
+    }
 
     function renderTable() {
       tableBody.innerHTML = "";
       for (var i = 0; i < docs.length; i++) {
         var tr = document.createElement("tr");
         tr.innerHTML = "<td>" + docs[i].section + "</td>" +
+          "<td>" + (docs[i].date || "—") + "</td>" +
           "<td>" + (docs[i].number || "—") + "</td>" +
           "<td>" + docs[i].title + "</td>" +
           "<td>" + docs[i].text + "</td>" +
@@ -255,6 +292,7 @@
 
     function addDoc() {
       var sectionSelect = document.getElementById("sectionSelect");
+      var date = document.getElementById("docDate").value;
       var title = document.getElementById("docTitle").value;
       var number = document.getElementById("docNumber").value;
       var text = document.getElementById("docText").value;
@@ -264,28 +302,68 @@
       }
       docs.push({
         section: sectionSelect.options[sectionSelect.selectedIndex].text,
+        date: date,
         number: number,
         title: title,
         text: text
       });
+      saveDocs();
       document.getElementById("docTitle").value = "";
+      document.getElementById("docDate").value = "";
       document.getElementById("docNumber").value = "";
       document.getElementById("docText").value = "";
       renderTable();
     }
 
+    function resetStorage() {
+      if (confirm("Сбросить локальные данные и вернуть демо-записи?")) {
+        docs = demoDocs.slice(0);
+        saveDocs();
+        renderTable();
+      }
+    }
+
+    function exportJson() {
+      document.getElementById("jsonData").value = JSON.stringify(docs, null, 2);
+    }
+
+    function importJson() {
+      var value = document.getElementById("jsonData").value;
+      if (!value) {
+        alert("Вставьте JSON в поле.");
+        return;
+      }
+      try {
+        var parsed = JSON.parse(value);
+        if (!parsed || !parsed.length) {
+          alert("Некорректный формат.");
+          return;
+        }
+        docs = parsed;
+        saveDocs();
+        renderTable();
+      } catch (err) {
+        alert("Ошибка JSON: " + err.message);
+      }
+    }
+
     document.getElementById("addDoc").onclick = addDoc;
+    document.getElementById("resetStorage").onclick = resetStorage;
+    document.getElementById("exportJson").onclick = exportJson;
+    document.getElementById("importJson").onclick = importJson;
     document.getElementById("docTable").onclick = function (evt) {
       var target = evt.target || evt.srcElement;
       if (target && target.getAttribute("data-index")) {
         var idx = parseInt(target.getAttribute("data-index"), 10);
         if (!isNaN(idx)) {
           docs.splice(idx, 1);
+          saveDocs();
           renderTable();
         }
       }
     };
 
+    loadDocs();
     renderTable();
   })();
 </script>
